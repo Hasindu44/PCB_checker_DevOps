@@ -1,15 +1,31 @@
-# CircuitGuard frontend prototype
+# CircuitGuard
 
-A frontend-only React and Tailwind prototype for a PCB quality workspace. It includes a responsive login, a browser-persisted demo session, sign out, and drag-and-drop ZIP selection.
+A React workspace with an Express authentication API and PostgreSQL user database.
+
+## Docker setup
+
+Copy `.env.example` to `.env`, replace both secrets, then run:
+
+```sh
+docker compose up --build
+```
+
+Open <http://localhost:8080>. Create an account from the login screen, then sign in with the stored credentials.
 
 ## Run locally
 
-```sh
-cd frontend
-npm install
-npm run dev
-```
+1. Start PostgreSQL and create a `circuitguard` database.
+2. Copy `backend/.env.example` to `backend/.env` and update the connection string and JWT secret.
+3. Run `npm install` and `npm run dev` inside `backend`.
+4. Run `npm install` and `npm run dev` inside `frontend`.
 
-Open <http://localhost:5173>. Enter any valid email and a password containing at least six characters.
+The frontend runs on <http://localhost:5173> and proxies `/api` requests to <http://localhost:3000>.
 
-> The login is intentionally client-side only. It is useful for UI development, but production authentication will require a backend identity service and secure sessions.
+## Authentication
+
+- Passwords are hashed with bcrypt and never returned by the API.
+- The signed session token is stored in an HTTP-only, SameSite cookie.
+- Login and registration endpoints are rate-limited.
+- The API creates the `users` table when it starts.
+
+For an HTTPS deployment, set `COOKIE_SECURE=true`. Use a proper migration tool before evolving the production schema beyond this initial table.
