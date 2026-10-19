@@ -24,3 +24,25 @@ export const authApi = {
   }),
   logout: () => request('/api/auth/logout', { method: 'POST' }),
 };
+
+export const drcApi = {
+  profiles: () => request('/api/drc/profiles'),
+  jobs: () => request('/api/drc/jobs'),
+  validate: async (file, profileId) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('profileId', profileId);
+    const response = await fetch('/api/drc/validate', {
+      method: 'POST',
+      credentials: 'include',
+      body: form,
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(data?.message || 'The PCB archive could not be processed.');
+      error.data = data;
+      throw error;
+    }
+    return data;
+  },
+};

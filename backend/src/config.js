@@ -7,6 +7,8 @@ module.exports = {
   databaseUrl: process.env.DATABASE_URL || 'postgresql://circuitguard:circuitguard@localhost:5432/circuitguard',
   jwtSecret: process.env.JWT_SECRET || 'local-development-secret-change-before-production',
   frontendOrigin: process.env.FRONTEND_ORIGIN || 'http://localhost:5173',
+  drcEngineUrl: process.env.DRC_ENGINE_URL || 'http://localhost:8000',
+  drcEngineTimeoutMs: Number(process.env.DRC_ENGINE_TIMEOUT_MS || 120_000),
   isProduction,
   cookieSecure: process.env.COOKIE_SECURE
     ? process.env.COOKIE_SECURE === 'true'

@@ -18,6 +18,8 @@ export function Icon({ name, className = 'h-5 w-5' }) {
     board: <><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8" cy="8" r="1.5" /><circle cx="16" cy="16" r="1.5" /><path d="M9.5 8H15v4h1M8 9.5V16h4" /></>,
     rules: <><path d="M4 7h10M18 7h2M4 17h2M10 17h10" /><circle cx="16" cy="7" r="2" /><circle cx="8" cy="17" r="2" /></>,
     archive: <><path d="M4 7h16v13H4zM3 4h18v3H3z" /><path d="M9 11h6" /></>,
+    search: <><circle cx="10.8" cy="10.8" r="6.3" /><path d="m15.5 15.5 4.2 4.2" /></>,
+    refresh: <><path d="M20 7v5h-5" /><path d="M4.7 9A7.5 7.5 0 0 1 18.3 6L20 7M4 17v-5h5" /><path d="M19.3 15A7.5 7.5 0 0 1 5.7 18L4 17" /></>,
     logout: <><path d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9" /></>,
     chevron: <path d="m9 18 6-6-6-6" />,
     close: <path d="m6 6 12 12M18 6 6 18" />,
