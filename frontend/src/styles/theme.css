@@ -1,0 +1,97 @@
+:root {
+  /* Color Palette */
+  --bg-primary: #080B0F;
+  --bg-secondary: #0D1117;
+  --bg-tertiary: #11161D;
+  --card-bg: #151B23;
+  --card-hover: #1A222D;
+  --card-active: #1F2836;
+  
+  --border-subtle: #1C232E;
+  --border-default: #252D38;
+  --border-hover: #364150;
+  --border-active: #48566A;
+
+  --text-primary: #F5F7FA;
+  --text-secondary: #8B96A5;
+  --text-muted: #5C6777;
+  --text-inverse: #080B0F;
+
+  /* Brand Colors (derived directly from CircuitGuard logo) */
+  --brand-primary: #00F0A0;
+  --brand-secondary: #05D38A;
+  --brand-hover: #1AFFB0;
+  --brand-active: #00D68F;
+  --brand-glow: rgba(0, 240, 160, 0.18);
+  --brand-glow-lg: 0 0 24px rgba(0, 240, 160, 0.28);
+  --brand-tint: rgba(0, 240, 160, 0.08);
+  --brand-tint-strong: rgba(0, 240, 160, 0.14);
+
+  /* Status Colors */
+  --pass: #22C55E;
+  --pass-bg: rgba(34, 197, 94, 0.12);
+  --pass-border: rgba(34, 197, 94, 0.28);
+  --pass-glow: rgba(34, 197, 94, 0.2);
+
+  --fail: #EF4444;
+  --fail-bg: rgba(239, 68, 68, 0.12);
+  --fail-border: rgba(239, 68, 68, 0.28);
+  --fail-glow: rgba(239, 68, 68, 0.2);
+
+  --error: #F59E0B;
+  --error-bg: rgba(245, 158, 11, 0.12);
+  --error-border: rgba(245, 158, 11, 0.28);
+  --error-glow: rgba(245, 158, 11, 0.2);
+
+  --info: #38BDF8;
+  --info-bg: rgba(56, 189, 248, 0.12);
+  --info-border: rgba(56, 189, 248, 0.28);
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, Menlo, monospace;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.5), 0 2px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.6), 0 4px 10px -2px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 20px rgba(0, 240, 160, 0.15);
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-slow: 400ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Subtle PCB Grid & Traces */
+.pcb-grid-bg {
+  background-color: var(--bg-primary);
+  background-image: 
+    linear-gradient(rgba(37, 45, 56, 0.22) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(37, 45, 56, 0.22) 1px, transparent 1px),
+    radial-gradient(circle at 50% 0%, rgba(0, 240, 160, 0.05) 0%, transparent 65%);
+  background-size: 32px 32px, 32px 32px, 100% 100%;
+}
+
+.pcb-circuit-pattern {
+  background-image: radial-gradient(rgba(0, 240, 160, 0.15) 1px, transparent 1px);
+  background-size: 24px 24px;
+}

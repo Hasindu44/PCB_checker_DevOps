@@ -1,49 +1,77 @@
-import { useEffect, useState } from 'react';
-import Dashboard from './components/Dashboard';
-import Login from './components/Login';
-import { Mark } from './components/Visuals';
-import { authApi } from './api';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ToastProvider } from './components/common/Toast';
+import AppLayout from './components/layout/AppLayout';
+import DashboardPage from './pages/DashboardPage';
+import ProjectsPage from './pages/ProjectsPage';
+import ProjectDetailPage from './pages/ProjectDetailPage';
+import DrcResultsPage from './pages/DrcResultsPage';
+import DrcResultDetailPage from './pages/DrcResultDetailPage';
+import ActivityPage from './pages/ActivityPage';
+import SettingsPage from './pages/SettingsPage';
+import LoginPage from './pages/LoginPage';
+import { api } from './services/api';
 
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [checkingSession, setCheckingSession] = useState(true);
+  const [user, setUser] = useState({
+    id: 1,
+    fullName: 'Vidu Jayasundara',
+    role: 'Lead Hardware Engineer',
+    email: 'engineer@circuitguard.io',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=128&fit=crop&crop=faces',
+  });
+
+  const [projects, setProjects] = useState([]);
+
+  const refreshGlobalData = async () => {
+    try {
+      const projList = await api.getProjects();
+      setProjects(projList || []);
+      const currentUser = await api.getCurrentUser();
+      if (currentUser) setUser(currentUser);
+    } catch (err) {
+      console.warn('Initial global data sync notice:', err.message);
+    }
+  };
 
   useEffect(() => {
-    authApi.currentUser()
-      .then(({ user: currentUser }) => setUser(currentUser))
-      .catch(() => setUser(null))
-      .finally(() => setCheckingSession(false));
+    refreshGlobalData();
   }, []);
 
-  async function authenticate({ mode, ...details }) {
-    const response = mode === 'register'
-      ? await authApi.register(details)
-      : await authApi.login(details);
-    setUser(response.user);
-  }
-
-  async function logout() {
-    try {
-      await authApi.logout();
-    } finally {
-      setUser(null);
-    }
-  }
-
-  if (checkingSession) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#f5f6f2] text-[#687068]">
-        <div className="flex flex-col items-center gap-4">
-          <Mark className="h-10 w-10" />
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em]">Opening workspace</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (!user) return <Login onAuthenticate={authenticate} />;
-
   return (
-    <Dashboard user={user} onLogout={logout} />
+    <ToastProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Authentication Route */}
+          <Route
+            path="/login"
+            element={<LoginPage onLoginSuccess={(u) => setUser(u)} />}
+          />
+
+          {/* Core Application Shell Routes */}
+          <Route
+            path="/"
+            element={
+              <AppLayout
+                user={user}
+                projects={projects}
+                onRefreshData={refreshGlobalData}
+              />
+            }
+          >
+            <Route index element={<DashboardPage />} />
+            <Route path="projects" element={<ProjectsPage />} />
+            <Route path="projects/:id" element={<ProjectDetailPage />} />
+            <Route path="drc-results" element={<DrcResultsPage />} />
+            <Route path="drc-results/:id" element={<DrcResultDetailPage />} />
+            <Route path="activity" element={<ActivityPage />} />
+            <Route path="settings" element={<SettingsPage user={user} />} />
+          </Route>
+
+          {/* Catch-all redirect to Dashboard */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </ToastProvider>
   );
 }
