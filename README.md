@@ -1,6 +1,6 @@
 # CircuitGuard
 
-A React workspace with an Express authentication API and PostgreSQL user database.
+A React workspace with an Express API, PostgreSQL database, and a Python PCB design-rule checking service. Signed-in users can upload Gerber ZIP archives, choose a manufacturing profile, and review the saved DRC report.
 
 ## Build separate Docker images
 
@@ -37,7 +37,7 @@ docker compose up --build
 
 Open <http://localhost:8080>. Create an account from the login screen, then sign in with the stored credentials.
 
-Compose builds the same two independent images and also starts PostgreSQL. The root `.env` should contain:
+Compose builds the frontend, Node.js API, and Python DRC engine images and also starts PostgreSQL. The root `.env` should contain:
 
 ```env
 POSTGRES_PASSWORD=use-a-url-safe-database-password
@@ -112,11 +112,19 @@ On Windows Command Prompt, place each `docker run` command on one line or replac
 ## Run locally
 
 1. Start PostgreSQL and create a `circuitguard` database.
-2. Copy `backend/.env.example` to `backend/.env` and update the connection string and JWT secret.
-3. Run `npm install` and `npm run dev` inside `backend`.
-4. Run `npm install` and `npm run dev` inside `frontend`.
+2. Copy `backend/.env.example` to `backend/.env` and set its database connection and JWT secret.
+3. In `backend-fastapi`, create/activate a Python virtual environment, install `requirements.txt`, then run `uvicorn main:app --reload --host 0.0.0.0 --port 8000`.
+4. In `backend`, run `npm install` and `npm run dev`.
+5. In `frontend`, run `npm install` and `npm run dev`.
 
-The frontend runs on <http://localhost:5173> and proxies `/api` requests to <http://localhost:3000>.
+The frontend runs on <http://localhost:5173> and proxies `/api` requests to <http://localhost:3000>. The API connects to the DRC engine at `http://localhost:8000` by default. The API creates the standard fabrication profile on startup; DRC job history is saved per user in PostgreSQL.
+
+## PCB upload and DRC scope
+
+- `POST /api/drc/validate` accepts an authenticated multipart upload with `file` (ZIP) and `profileId` fields. Uploads are limited to 25 MB.
+- `GET /api/drc/profiles` returns available rule profiles; `GET /api/drc/jobs` returns the signed-in user's recent jobs.
+- The Python service parses common RS-274X Gerber and Excellon files and checks minimum trace width, copper clearance, and limited circular-pad annular rings. It returns warnings for unsupported/approximate cases.
+- This is an early geometry-based checker, not a manufacturing-certified DRC tool. Verify results in a PCB CAD tool and with your fabricator before ordering boards.
 
 ## Authentication
 

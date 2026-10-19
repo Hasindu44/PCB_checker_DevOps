@@ -28,13 +28,27 @@ services:
       COOKIE_SECURE: "false"
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the root .env file}
       FRONTEND_ORIGIN: http://localhost:8080
+      DRC_ENGINE_URL: http://drc-engine:8000
+      DRC_ENGINE_TIMEOUT_MS: 120000
     ports:
       - "3000:3000"
     depends_on:
       database:
         condition: service_healthy
+      drc-engine:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  drc-engine:
+    build: ./backend-fastapi
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 10s
       timeout: 5s
       retries: 5
