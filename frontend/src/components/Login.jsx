@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { BoardSchematic, Icon, Mark } from './Visuals';
 
-export default function Login({ onAuthenticate }) {
-  const [mode, setMode] = useState('login');
+export default function Login({ onAuthenticate, onBackToHome, initialMode = 'login' }) {
+  const [mode, setMode] = useState(initialMode);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,10 +35,10 @@ export default function Login({ onAuthenticate }) {
 
   return (
     <main className="min-h-screen bg-[#f7f7f3] text-[#17201b] lg:grid lg:grid-cols-[minmax(440px,0.9fr)_1.1fr]">
-      <section className="relative hidden min-h-screen overflow-hidden bg-[#14231c] lg:flex lg:flex-col" aria-label="CircuitGuard introduction">
+      <section className="relative hidden min-h-screen overflow-hidden bg-[#14231c] lg:flex lg:flex-col" aria-label="Tracelab introduction">
         <div className="relative z-10 flex items-center gap-3 px-10 py-9 xl:px-14">
           <Mark light />
-          <div className="text-white"><p className="text-[15px] font-semibold tracking-[-0.015em]">CircuitGuard</p><p className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#85978c]">Hardware review</p></div>
+          <div className="text-white"><p className="text-[15px] font-semibold tracking-[-0.015em]">Tracelab</p><p className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#85978c]">Hardware review</p></div>
         </div>
         <div className="relative z-10 px-10 pt-12 xl:px-14 xl:pt-16">
           <p className="mb-5 font-mono text-[11px] uppercase tracking-[0.19em] text-[#a8c471]">Design confidence, before fabrication</p>
@@ -48,16 +48,17 @@ export default function Login({ onAuthenticate }) {
         <div className="relative mt-auto h-[42vh] min-h-[300px] border-t border-[#2b3d34]"><BoardSchematic /></div>
       </section>
 
-      <section className="flex min-h-screen flex-col">
+      <section className="relative flex min-h-screen flex-col">
+        {onBackToHome && <button type="button" onClick={onBackToHome} className="absolute right-6 top-[74px] z-10 rounded-md px-3 py-2 text-xs font-semibold text-[#657167] transition hover:bg-[#eef1eb] hover:text-[#24352a] sm:right-10 lg:top-7">← Back to homepage</button>}
         <header className="flex items-center justify-between border-b border-[#e2e3dd] px-6 py-5 lg:hidden">
-          <div className="flex items-center gap-3"><Mark /><span className="text-sm font-semibold">CircuitGuard</span></div>
+          <div className="flex items-center gap-3"><Mark /><span className="text-sm font-semibold">Tracelab</span></div>
           <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#7d837e]">Secure access</span>
         </header>
 
         <div className="flex flex-1 items-center justify-center px-6 py-12 sm:px-10">
           <div className="w-full max-w-[420px]">
             <div className="mb-9">
-              <p className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-[#71805f]">CircuitGuard workspace</p>
+              <p className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-[#71805f]">Tracelab workspace</p>
               <h2 className="mt-3 text-[32px] font-semibold tracking-[-0.035em]">{mode === 'login' ? 'Welcome back' : 'Create your account'}</h2>
               <p className="mt-3 text-sm leading-6 text-[#68706a]">{mode === 'login' ? 'Sign in to continue to your hardware review workspace.' : 'Set up your account to start organizing board reviews.'}</p>
             </div>

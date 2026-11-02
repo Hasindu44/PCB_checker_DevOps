@@ -1,0 +1,75 @@
+/* Modern PCB Review Workbench Styles */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(34, 197, 94, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(34, 197, 94, 0.45);
+  }
+}
+
+@keyframes radarPing {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+.workbench-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background-color: #070d0a;
+  color: #e2e8f0;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #09120d;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1c3325;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #284734;
+}
+
+/* PCB Canvas Grab styles */
+.cursor-grab {
+  cursor: grab;
+}
+
+.cursor-grabbing {
+  cursor: grabbing;
+}
+
+/* Tooltip caret */
+.tooltip-caret {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #14241b;
+  margin: 0 auto;
+}
+
+/* Finding Card Glow */
+.finding-card-active {
+  box-shadow: 0 0 15px rgba(74, 222, 128, 0.15);
+}
+
