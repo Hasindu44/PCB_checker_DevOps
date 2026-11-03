@@ -49,9 +49,11 @@ async function initializeDatabase() {
       total_errors INTEGER NOT NULL DEFAULT 0 CHECK (total_errors >= 0),
       errors JSONB NOT NULL DEFAULT '[]'::jsonb,
       warnings JSONB NOT NULL DEFAULT '[]'::jsonb,
+      board JSONB NOT NULL DEFAULT '{}'::jsonb,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  await pool.query(`ALTER TABLE drc_jobs ADD COLUMN IF NOT EXISTS board JSONB NOT NULL DEFAULT '{}'::jsonb`);
   await pool.query(`CREATE INDEX IF NOT EXISTS drc_jobs_user_created_idx ON drc_jobs (user_id, created_at DESC)`);
 }
 

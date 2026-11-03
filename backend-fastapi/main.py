@@ -21,6 +21,8 @@ MAX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
 MAX_ARCHIVE_FILES = 300
 MAX_PRIMITIVES_PER_LAYER = 20_000
 MAX_REPORTED_ERRORS = 1_000
+MAX_VISUAL_PATHS = 4_000
+MAX_VISUAL_PATH_CHARS = 1_500_000
 
 COPPER_EXTENSIONS = {".gtl", ".gbl", ".g1", ".g2", ".g3", ".g4", ".g5", ".g6", ".g7", ".g8", ".cmp", ".sol", ".top", ".bot"}
 GERBER_EXTENSIONS = {".gbr", ".ger", ".pho", ".art"}
@@ -47,6 +49,7 @@ class ValidationResult(BaseModel):
     total_errors: int
     errors: list[DrcError]
     warnings: list[str]
+    board: dict[str, Any]
 
 
 def _positive_number(value: Any) -> float | None:
@@ -156,6 +159,103 @@ def _make_error(rule: str, message: str, point: Point) -> DrcError:
         message=message,
         coordinates=Coordinates(x=round(point.x, 4), y=round(point.y, 4)),
     )
+
+
+def _iter_polygons(geometry: BaseGeometry) -> list[Any]:
+    if geometry.geom_type == "Polygon":
+        return [geometry]
+    if hasattr(geometry, "geoms"):
+        return [polygon for child in geometry.geoms for polygon in _iter_polygons(child)]
+    return []
+
+
+def _ring_path(coordinates: Any, min_x: float, max_y: float) -> str:
+    points = list(coordinates)
+    if len(points) < 4:
+        return ""
+    commands = [f"M{points[0][0] - min_x:.3f},{max_y - points[0][1]:.3f}"]
+    commands.extend(f"L{x - min_x:.3f},{max_y - y:.3f}" for x, y, *_ in points[1:])
+    return "".join(commands) + "Z"
+
+
+def _geometry_path(geometry: BaseGeometry, min_x: float, max_y: float, tolerance: float) -> str:
+    try:
+        simplified = geometry.simplify(tolerance, preserve_topology=True)
+    except Exception:
+        simplified = geometry
+    paths: list[str] = []
+    for polygon in _iter_polygons(simplified):
+        path = _ring_path(polygon.exterior.coords, min_x, max_y)
+        for interior in polygon.interiors:
+            path += _ring_path(interior.coords, min_x, max_y)
+        if path:
+            paths.append(path)
+    return "".join(paths)
+
+
+def _layer_color(name: str) -> str:
+    normalized = name.lower()
+    if any(token in normalized for token in ("bottom", "b_cu", ".gbl", ".bot", ".sol")):
+        return "#78aede"
+    if any(token in normalized for token in ("inner", "in1", "in2", "in3", "in4")) or re.search(r"\.g[1-8]$", normalized):
+        return "#309978"
+    return "#d6a34a"
+
+
+def _board_visualization(parsed_layers: list[tuple[str, list[Any], list[BaseGeometry]]]) -> dict[str, Any]:
+    all_shapes = [shape for _, _, shapes in parsed_layers for shape in shapes if not shape.is_empty]
+    min_x = min(shape.bounds[0] for shape in all_shapes)
+    min_y = min(shape.bounds[1] for shape in all_shapes)
+    max_x = max(shape.bounds[2] for shape in all_shapes)
+    max_y = max(shape.bounds[3] for shape in all_shapes)
+    width = max(max_x - min_x, 0.01)
+    height = max(max_y - min_y, 0.01)
+    tolerance = max(width, height) * 0.00015
+
+    layers: list[dict[str, Any]] = []
+    path_count = 0
+    path_chars = 0
+    truncated = False
+    for layer_name, _primitives, shapes in parsed_layers:
+        layer_paths: list[str] = []
+        for shape in shapes:
+            if path_count >= MAX_VISUAL_PATHS or path_chars >= MAX_VISUAL_PATH_CHARS:
+                truncated = True
+                break
+            path = _geometry_path(shape, min_x, max_y, tolerance)
+            if not path:
+                continue
+            if path_chars + len(path) > MAX_VISUAL_PATH_CHARS:
+                remaining = MAX_VISUAL_PATH_CHARS - path_chars
+                if remaining > 32:
+                    truncated_path = path[:remaining]
+                    safe_end = truncated_path.rfind("Z")
+                    if safe_end > 0:
+                        truncated_path = truncated_path[:safe_end + 1]
+                        layer_paths.append(truncated_path)
+                        path_chars += len(truncated_path)
+                truncated = True
+                break
+            layer_paths.append(path)
+            path_count += 1
+            path_chars += len(path)
+        layers.append({
+            "name": PurePosixPath(layer_name).name,
+            "color": _layer_color(layer_name),
+            "paths": layer_paths,
+        })
+        if truncated:
+            break
+
+    return {
+        "width": round(width, 4),
+        "height": round(height, 4),
+        "origin_x": round(min_x, 4),
+        "top_y": round(max_y, 4),
+        "padding": round(max(width, height) * 0.04, 4),
+        "layers": layers,
+        "truncated": truncated,
+    }
 
 
 def _check_layer_clearance(shapes: list[BaseGeometry], minimum: float) -> list[DrcError]:
@@ -288,7 +388,7 @@ async def validate(
         copper_shapes: list[BaseGeometry] = []
         copper_primitives: list[Any] = []
         circular_pads: list[tuple[Point, float]] = []
-        parsed_copper_layers: list[tuple[list[Any], list[BaseGeometry]]] = []
+        parsed_copper_layers: list[tuple[str, list[Any], list[BaseGeometry]]] = []
         for info in copper_members:
             layer = _parse_layer(info.filename, archive.read(info))
             primitives = list(getattr(layer, "primitives", []))
@@ -308,13 +408,13 @@ async def validate(
                     diameter = _positive_number(getattr(primitive, "diameter", None))
                     if position is not None and diameter is not None:
                         circular_pads.append((Point(position), diameter))
-            parsed_copper_layers.append((primitives, layer_shapes))
+            parsed_copper_layers.append((info.filename, primitives, layer_shapes))
 
         if not copper_shapes:
             raise HTTPException(status_code=422, detail="Copper layers contain no supported geometry.")
 
         errors = _check_trace_width(copper_primitives, min_trace_width)
-        for _primitives, layer_shapes in parsed_copper_layers:
+        for _layer_name, _primitives, layer_shapes in parsed_copper_layers:
             errors.extend(_check_layer_clearance(layer_shapes, min_clearance))
             if len(errors) >= MAX_REPORTED_ERRORS:
                 errors = errors[:MAX_REPORTED_ERRORS]
@@ -323,14 +423,18 @@ async def validate(
         drill_layers = [_parse_layer(info.filename, archive.read(info)) for info in drill_members]
         errors.extend(_check_annular_ring(drill_layers, circular_pads, min_annular_ring))
         errors = errors[:MAX_REPORTED_ERRORS]
+        board = _board_visualization(parsed_copper_layers)
 
     warnings = [
         "This initial checker supports common RS-274X Gerber and Excellon files. Complex macro apertures and clear-polarity regions use approximate primitive bounds.",
         "Annular-ring checks currently compare drill hits with circular copper pads; rectangular and slotted pads are not evaluated.",
     ]
+    if board["truncated"]:
+        warnings.append("The board preview was simplified to keep the report responsive; some fine geometry may not be shown.")
     return ValidationResult(
         status="FAIL" if errors else "PASS",
         total_errors=len(errors),
         errors=errors,
         warnings=warnings,
+        board=board,
     )

@@ -1,6 +1,6 @@
 export function Mark({ light = false, className = 'h-9 w-9' }) {
-  const background = light ? '#eef7c8' : '#17261f';
-  const trace = light ? '#17261f' : '#c8ee62';
+  const background = light ? '#f4f0df' : '#0d5140';
+  const trace = light ? '#0d5140' : '#e9b444';
   return (
     <svg viewBox="0 0 40 40" className={className} aria-hidden="true">
       <rect width="40" height="40" rx="8" fill={background} />
@@ -26,7 +26,32 @@ export function Icon({ name, className = 'h-5 w-5' }) {
     eye: <><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="2.5" /></>,
     eyeOff: <><path d="m3 3 18 18M10.7 6.1A9.7 9.7 0 0 1 12 6c6 0 9.5 6 9.5 6a15 15 0 0 1-2.1 2.8M6.2 6.2A15.8 15.8 0 0 0 2.5 12s3.5 6 9.5 6c1 0 2-.2 2.8-.5" /></>,
     check: <path d="m5 12 4 4L19 6" />,
+    alert: <><path d="m12 3 9 17H3L12 3Z" /><path d="M12 9v4M12 17h.01" /></>,
+    info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></>,
+    fit: <><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3" /><path d="M8 8h8v8H8z" /></>,
+    target: <><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2" /><path d="M12 2v3M22 12h-3M12 22v-3M2 12h3" /></>,
     file: <><path d="M6 2h8l4 4v16H6z" /><path d="M14 2v5h5M9 13h6M9 17h4" /></>,
+    clock: <><circle cx="12" cy="12" r="9" /><polyline points="12 6 12 12 16 14" /></>,
+    user: <><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></>,
+    bell: <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></>,
+    layers: <><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></>,
+    crosshair: <><circle cx="12" cy="12" r="8" /><line x1="12" y1="2" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="22" /><line x1="2" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="22" y2="12" /></>,
+    zoomIn: <><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" /></>,
+    zoomOut: <><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="8" y1="11" x2="14" y2="11" /></>,
+    expand: <><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></>,
+    minimize: <><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7" /></>,
+    sparkles: <><path d="m12 3 1.9 4.8L19 10l-5.1 2.2L12 17l-1.9-4.8L5 10l5.1-2.2L12 3z" /><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16z" /><path d="M5 2l.5 1.5L7 4l-1.5.5L5 6l-.5-1.5L3 4l1.5-.5L5 2z" /></>,
+    chart: <><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></>,
+    sliders: <><line x1="4" y1="21" x2="4" y2="14" /><line x1="4" y1="10" x2="4" y2="3" /><line x1="12" y1="21" x2="12" y2="12" /><line x1="12" y1="8" x2="12" y2="3" /><line x1="20" y1="21" x2="20" y2="16" /><line x1="20" y1="12" x2="20" y2="3" /><line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" /></>,
+    download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>,
+    arrowLeft: <line x1="19" y1="12" x2="5" y2="12" />,
+    arrowRight: <line x1="5" y1="12" x2="19" y2="12" />,
+    prev: <polyline points="15 18 9 12 15 6" />,
+    next: <polyline points="9 18 15 12 9 6" />,
+    shieldCheck: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></>,
+    cpu: <><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /><line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" /><line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" /><line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="15" x2="23" y2="15" /><line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="15" x2="4" y2="15" /></>,
+    ruler: <><path d="M21.3 8.7 8.7 21.3a2 2 0 0 1-2.8 0l-3.2-3.2a2 2 0 0 1 0-2.8L15.3 2.7a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8z" /><line x1="14.5" y1="7.5" x2="12.5" y2="9.5" /><line x1="11.5" y1="10.5" x2="9.5" y2="12.5" /><line x1="8.5" y1="13.5" x2="6.5" y2="15.5" /></>,
+    chevronDown: <polyline points="6 9 12 15 18 9" />,
   };
   return (
     <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -35,16 +60,16 @@ export function Icon({ name, className = 'h-5 w-5' }) {
   );
 }
 
-export function BoardSchematic() {
+export function BoardSchematic({ patternId = 'pcb-grid' }) {
   return (
     <svg viewBox="0 0 720 470" className="h-full w-full" role="img" aria-label="Abstract printed circuit board schematic">
       <defs>
-        <pattern id="pcb-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+        <pattern id={patternId} width="24" height="24" patternUnits="userSpaceOnUse">
           <path d="M24 0H0V24" fill="none" stroke="#2a3a32" strokeWidth="1" />
         </pattern>
       </defs>
       <rect width="720" height="470" fill="#14231c" />
-      <rect width="720" height="470" fill="url(#pcb-grid)" opacity=".7" />
+      <rect width="720" height="470" fill={`url(#${patternId})`} opacity=".7" />
       <g fill="none" stroke="#71906d" strokeWidth="2">
         <path d="M0 93h98l35 35h122l34-34h77" />
         <path d="M0 350h118l42-42h102l31 31h91" />

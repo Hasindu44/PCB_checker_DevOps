@@ -28,6 +28,7 @@ export const authApi = {
 export const drcApi = {
   profiles: () => request('/api/drc/profiles'),
   jobs: () => request('/api/drc/jobs'),
+  job: (id) => request(`/api/drc/jobs/${encodeURIComponent(id)}`),
   validate: async (file, profileId) => {
     const form = new FormData();
     form.append('file', file);

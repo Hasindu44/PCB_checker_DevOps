@@ -122,8 +122,8 @@ The frontend runs on <http://localhost:5173> and proxies `/api` requests to <htt
 ## PCB upload and DRC scope
 
 - `POST /api/drc/validate` accepts an authenticated multipart upload with `file` (ZIP) and `profileId` fields. Uploads are limited to 25 MB.
-- `GET /api/drc/profiles` returns available rule profiles; `GET /api/drc/jobs` returns the signed-in user's recent jobs.
-- The Python service parses common RS-274X Gerber and Excellon files and checks minimum trace width, copper clearance, and limited circular-pad annular rings. It returns warnings for unsupported/approximate cases.
+- `GET /api/drc/profiles` returns available rule profiles; `GET /api/drc/jobs` returns recent job summaries; `GET /api/drc/jobs/:jobId` returns a saved report and its board preview.
+- The Python service parses common RS-274X Gerber and Excellon files, checks minimum trace width, copper clearance, and limited circular-pad annular rings, then returns simplified copper-layer paths for the interactive board view. It returns warnings for unsupported/approximate cases.
 - This is an early geometry-based checker, not a manufacturing-certified DRC tool. Verify results in a PCB CAD tool and with your fabricator before ordering boards.
 
 ## Authentication

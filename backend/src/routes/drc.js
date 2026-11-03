@@ -24,16 +24,28 @@ function parseJson(value, fallback = []) {
   try { return JSON.parse(value); } catch { return fallback; }
 }
 
+function parseObject(value, fallback = {}) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+  if (typeof value !== 'string') return fallback;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 async function saveJob({ userId, fileName, profile, result }) {
   const errors = parseJson(result.errors);
   const warnings = parseJson(result.warnings);
+  const board = parseObject(result.board);
   const status = ['PASS', 'FAIL', 'ERROR'].includes(result.status) ? result.status : 'ERROR';
   const id = randomUUID();
   const { rows } = await pool.query(
-    `INSERT INTO drc_jobs (id, user_id, filename, profile_id, profile_name, status, total_errors, errors, warnings)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb)
-     RETURNING id, filename, profile_id, profile_name, status, total_errors, errors, warnings, created_at`,
-    [id, userId, fileName, profile.id, profile.name, status, errors.length, JSON.stringify(errors), JSON.stringify(warnings)]
+    `INSERT INTO drc_jobs (id, user_id, filename, profile_id, profile_name, status, total_errors, errors, warnings, board)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb)
+     RETURNING id, filename, profile_id, profile_name, status, total_errors, errors, warnings, board, created_at`,
+    [id, userId, fileName, profile.id, profile.name, status, errors.length, JSON.stringify(errors), JSON.stringify(warnings), JSON.stringify(board)]
   );
   return rows[0];
 }
@@ -127,6 +139,23 @@ router.get('/jobs', requireUser, async (req, res, next) => {
       [req.user.id]
     );
     return res.json(rows);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/jobs/:jobId', requireUser, async (req, res, next) => {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.params.jobId)) {
+    return res.status(400).json({ message: 'Choose a valid DRC job.' });
+  }
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, filename, profile_id, profile_name, status, total_errors, errors, warnings, board, created_at
+       FROM drc_jobs WHERE id = $1 AND user_id = $2`,
+      [req.params.jobId, req.user.id]
+    );
+    if (!rows[0]) return res.status(404).json({ message: 'DRC job not found.' });
+    return res.json(rows[0]);
   } catch (error) {
     return next(error);
   }
