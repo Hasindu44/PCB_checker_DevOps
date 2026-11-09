@@ -29,10 +29,11 @@ export const drcApi = {
   profiles: () => request('/api/drc/profiles'),
   jobs: () => request('/api/drc/jobs'),
   job: (id) => request(`/api/drc/jobs/${encodeURIComponent(id)}`),
-  validate: async (file, profileId) => {
+  validate: async (file, profileId, analysisMode = 'GERBER') => {
     const form = new FormData();
     form.append('file', file);
-    form.append('profileId', profileId);
+    if (profileId) form.append('profileId', profileId);
+    form.append('analysisMode', analysisMode);
     const response = await fetch('/api/drc/validate', {
       method: 'POST',
       credentials: 'include',

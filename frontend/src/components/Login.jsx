@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import { BoardSchematic, Icon, Mark } from './Visuals';
+import { Icon, Mark } from './Visuals';
+import './TracelabWorkbench.css';
+import './Login.css';
+
+const highlights = [
+  { label: 'KiCad native DRC', detail: 'Connectivity, shorts, clearances and board rules' },
+  { label: 'Fabrication review', detail: 'Trace width, copper spacing and annular ring' },
+  { label: 'Saved history', detail: 'Every report kept with the profile that produced it' },
+];
 
 export default function Login({ onAuthenticate, onBackToHome, initialMode = 'login' }) {
   const [mode, setMode] = useState(initialMode);
@@ -34,73 +42,68 @@ export default function Login({ onAuthenticate, onBackToHome, initialMode = 'log
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f7f3] text-[#17201b] lg:grid lg:grid-cols-[minmax(440px,0.9fr)_1.1fr]">
-      <section className="relative hidden min-h-screen overflow-hidden bg-[#14231c] lg:flex lg:flex-col" aria-label="Tracelab introduction">
-        <div className="relative z-10 flex items-center gap-3 px-10 py-9 xl:px-14">
-          <Mark light />
-          <div className="text-white"><p className="text-[15px] font-semibold tracking-[-0.015em]">Tracelab</p><p className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#85978c]">Hardware review</p></div>
-        </div>
-        <div className="relative z-10 px-10 pt-12 xl:px-14 xl:pt-16">
-          <p className="mb-5 font-mono text-[11px] uppercase tracking-[0.19em] text-[#a8c471]">Design confidence, before fabrication</p>
-          <h1 className="max-w-[520px] text-[42px] font-semibold leading-[1.08] tracking-[-0.04em] text-white xl:text-[50px]">A clearer way to review PCB manufacturing files.</h1>
-          <p className="mt-6 max-w-md text-[15px] leading-7 text-[#aab7af]">Keep design packages, fabrication rules, and review results together in one focused workspace.</p>
-        </div>
-        <div className="relative mt-auto h-[42vh] min-h-[300px] border-t border-[#2b3d34]"><BoardSchematic /></div>
-      </section>
+    <div className="tl-workspace">
+      <header className="tl-topbar tl-auth-topbar">
+        <span className="tl-brand"><Mark className="tl-brand-mark" /><span>Tracelab</span></span>
+        {onBackToHome && <button type="button" className="tl-button tl-button-outline" onClick={onBackToHome}>← Back to homepage</button>}
+      </header>
 
-      <section className="relative flex min-h-screen flex-col">
-        {onBackToHome && <button type="button" onClick={onBackToHome} className="absolute right-6 top-[74px] z-10 rounded-md px-3 py-2 text-xs font-semibold text-[#657167] transition hover:bg-[#eef1eb] hover:text-[#24352a] sm:right-10 lg:top-7">← Back to homepage</button>}
-        <header className="flex items-center justify-between border-b border-[#e2e3dd] px-6 py-5 lg:hidden">
-          <div className="flex items-center gap-3"><Mark /><span className="text-sm font-semibold">Tracelab</span></div>
-          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-[#7d837e]">Secure access</span>
-        </header>
+      <main className="tl-main">
+        <div className="tl-content tl-auth-layout">
+          <section className="tl-auth-intro">
+            <p className="tl-eyebrow">TRACELAB WORKSPACE <i>·</i> SECURE ACCESS</p>
+            <h1>Review boards <em>before</em> they ship.</h1>
+            <p className="tl-lede">Keep design packages, fabrication rules and review results together in one focused workspace.</p>
+            <ul className="tl-auth-highlights">
+              {highlights.map((item) => (
+                <li key={item.label}><span className="tl-auth-dot" /><div><strong>{item.label}</strong><small>{item.detail}</small></div></li>
+              ))}
+            </ul>
+          </section>
 
-        <div className="flex flex-1 items-center justify-center px-6 py-12 sm:px-10">
-          <div className="w-full max-w-[420px]">
-            <div className="mb-9">
-              <p className="font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-[#71805f]">Tracelab workspace</p>
-              <h2 className="mt-3 text-[32px] font-semibold tracking-[-0.035em]">{mode === 'login' ? 'Welcome back' : 'Create your account'}</h2>
-              <p className="mt-3 text-sm leading-6 text-[#68706a]">{mode === 'login' ? 'Sign in to continue to your hardware review workspace.' : 'Set up your account to start organizing board reviews.'}</p>
+          <section className="tl-panel tl-auth-card" aria-label={mode === 'login' ? 'Sign in' : 'Create account'}>
+            <p className="tl-panel-label">{mode === 'login' ? 'WELCOME BACK' : 'NEW ACCOUNT'}</p>
+            <h2>{mode === 'login' ? 'Sign in to your workspace' : 'Create your account'}</h2>
+            <p className="tl-muted">{mode === 'login' ? 'Continue to your hardware review workspace.' : 'Set up your account to start organizing board reviews.'}</p>
+
+            <div className="tl-auth-tabs" role="tablist" aria-label="Authentication mode">
+              <button type="button" role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'is-selected' : ''} onClick={() => switchMode('login')}>Sign in</button>
+              <button type="button" role="tab" aria-selected={mode === 'register'} className={mode === 'register' ? 'is-selected' : ''} onClick={() => switchMode('register')}>Create account</button>
             </div>
 
-            <div className="mb-7 grid grid-cols-2 border-b border-[#d9dbd4]" role="tablist" aria-label="Authentication mode">
-              <button type="button" role="tab" aria-selected={mode === 'login'} onClick={() => switchMode('login')} className={`auth-tab ${mode === 'login' ? 'auth-tab-active' : ''}`}>Sign in</button>
-              <button type="button" role="tab" aria-selected={mode === 'register'} onClick={() => switchMode('register')} className={`auth-tab ${mode === 'register' ? 'auth-tab-active' : ''}`}>Create account</button>
-            </div>
-
-            <form className="space-y-5" onSubmit={submit} noValidate>
+            <form className="tl-auth-form" onSubmit={submit} noValidate>
               {mode === 'register' && <Field id="name" label="Full name" value={name} onChange={(value) => { setName(value); setError(''); }} autoComplete="name" placeholder="Alex Morgan" />}
               <Field id="email" label="Work email" type="email" value={email} onChange={(value) => { setEmail(value); setError(''); }} autoComplete="email" placeholder="alex@company.com" />
-              <div>
-                <label htmlFor="password" className="field-label">Password</label>
-                <div className="relative">
-                  <input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => { setPassword(event.target.value); setError(''); }} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder="At least 8 characters" className="field-input pr-12" />
-                  <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute inset-y-0 right-0 grid w-12 place-items-center text-[#7d837e] hover:text-[#17201b]" aria-label={showPassword ? 'Hide password' : 'Show password'}><Icon name={showPassword ? 'eyeOff' : 'eye'} className="h-[18px] w-[18px]" /></button>
+              <div className="tl-auth-field">
+                <label htmlFor="password">Password</label>
+                <div className="tl-auth-password">
+                  <input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => { setPassword(event.target.value); setError(''); }} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder="At least 8 characters" />
+                  <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'}><Icon name={showPassword ? 'eyeOff' : 'eye'} /></button>
                 </div>
               </div>
 
-              {error && <div role="alert" className="flex gap-3 border border-[#e4c4ba] bg-[#fff8f5] px-4 py-3 text-[13px] leading-5 text-[#923d2a]"><span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-[#b94b32]" />{error}</div>}
+              {error && <div role="alert" className="tl-auth-error"><i />{error}</div>}
 
-              <button type="submit" disabled={submitting} className="primary-button w-full">
+              <button type="submit" disabled={submitting} className="tl-button tl-button-orange tl-auth-submit">
+                {submitting && <span className="tl-spinner" />}
                 <span>{submitting ? 'Please wait' : mode === 'login' ? 'Sign in to workspace' : 'Create account'}</span>
-                {!submitting && <Icon name="chevron" className="h-4 w-4" />}
+                {!submitting && <Icon name="chevron" />}
               </button>
             </form>
 
-            <p className="mt-7 text-center text-xs leading-5 text-[#7b827c]">By continuing, you agree to keep account credentials private and follow your organization&apos;s data policy.</p>
-          </div>
+            <p className="tl-auth-footnote">By continuing, you agree to keep account credentials private and follow your organization&apos;s data policy.</p>
+          </section>
         </div>
-        <footer className="flex justify-between border-t border-[#e2e3dd] px-6 py-4 font-mono text-[9px] uppercase tracking-[0.16em] text-[#929791] sm:px-10"><span>Encrypted session</span><span>CG / Access 01</span></footer>
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }
 
 function Field({ id, label, type = 'text', value, onChange, autoComplete, placeholder }) {
   return (
-    <div>
-      <label htmlFor={id} className="field-label">{label}</label>
-      <input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} autoComplete={autoComplete} placeholder={placeholder} className="field-input" />
+    <div className="tl-auth-field">
+      <label htmlFor={id}>{label}</label>
+      <input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} autoComplete={autoComplete} placeholder={placeholder} />
     </div>
   );
 }

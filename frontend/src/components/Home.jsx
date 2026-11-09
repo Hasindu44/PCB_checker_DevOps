@@ -33,7 +33,7 @@ export default function Home({ onGetStarted, onSignIn }) {
         <section className="public-hero">
           <div className="hero-copy">
             <div className="eyebrow-pill"><span />PCB MANUFACTURING REVIEW</div>
-            <h1>Know what needs attention <em>before the board leaves your desk.</em></h1>
+            <h1>Know what needs attention <em>before</em> the board leaves your desk.</h1>
             <p className="hero-lede">A focused workspace for checking fabrication files against manufacturing rules—and keeping every result easy to review.</p>
             <div className="hero-actions"><button type="button" onClick={() => onGetStarted('register')} className="hero-primary">Start a design check <Icon name="chevron" className="h-4 w-4" /></button><button type="button" onClick={() => navigateTo('workflow')} className="hero-secondary">See how it works <span aria-hidden="true">↓</span></button></div>
             <div className="hero-note"><Icon name="check" className="h-4 w-4" /><span>Upload a Gerber ZIP · review the findings · keep the report</span></div>

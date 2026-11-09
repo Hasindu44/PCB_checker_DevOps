@@ -1,6 +1,6 @@
 # CircuitGuard
 
-A React workspace with an Express API, PostgreSQL database, and a Python PCB design-rule checking service. Signed-in users can upload Gerber ZIP archives, choose a manufacturing profile, and review the saved DRC report.
+A React workspace with an Express API, PostgreSQL database, and a Python PCB design-rule checking service. Signed-in users can upload manufacturing Gerbers or run KiCad's native, net-aware DRC on a KiCad project ZIP, then review the saved report and board preview.
 
 ## Build separate Docker images
 
@@ -37,7 +37,7 @@ docker compose up --build
 
 Open <http://localhost:8080>. Create an account from the login screen, then sign in with the stored credentials.
 
-Compose builds the frontend, Node.js API, and Python DRC engine images and also starts PostgreSQL. The root `.env` should contain:
+Compose builds the frontend, Node.js API, and Python DRC engine images and also starts PostgreSQL. The DRC engine image is based on KiCad's official command-line image and is larger than a Python-only image. The root `.env` should contain:
 
 ```env
 POSTGRES_PASSWORD=use-a-url-safe-database-password
@@ -113,7 +113,7 @@ On Windows Command Prompt, place each `docker run` command on one line or replac
 
 1. Start PostgreSQL and create a `circuitguard` database.
 2. Copy `backend/.env.example` to `backend/.env` and set its database connection and JWT secret.
-3. In `backend-fastapi`, create/activate a Python virtual environment, install `requirements.txt`, then run `uvicorn main:app --reload --host 0.0.0.0 --port 8000`.
+3. Install KiCad 9 or newer so `kicad-cli` is on PATH. In `backend-fastapi`, create/activate a Python virtual environment, install `requirements.txt`, then run `uvicorn main:app --reload --host 0.0.0.0 --port 8000`. If the executable is elsewhere, set `KICAD_CLI_PATH` to its full path.
 4. In `backend`, run `npm install` and `npm run dev`.
 5. In `frontend`, run `npm install` and `npm run dev`.
 
@@ -121,9 +121,11 @@ The frontend runs on <http://localhost:5173> and proxies `/api` requests to <htt
 
 ## PCB upload and DRC scope
 
-- `POST /api/drc/validate` accepts an authenticated multipart upload with `file` (ZIP) and `profileId` fields. Uploads are limited to 25 MB.
+- `POST /api/drc/validate` accepts an authenticated multipart upload with `file` (ZIP), `analysisMode` (`GERBER` or `KICAD`), and a `profileId` for Gerber mode. Uploads are limited to 25 MB.
 - `GET /api/drc/profiles` returns available rule profiles; `GET /api/drc/jobs` returns recent job summaries; `GET /api/drc/jobs/:jobId` returns a saved report and its board preview.
 - The Python service parses common RS-274X Gerber and Excellon files, checks minimum trace width, copper clearance, and limited circular-pad annular rings, then returns simplified copper-layer paths for the interactive board view. It returns warnings for unsupported/approximate cases.
+- KiCad mode requires exactly one `.kicad_pcb` file in the ZIP. Include matching `.kicad_pro` and `.kicad_dru` files to carry project settings and custom design rules; include a matching `.kicad_sch` to request schematic parity checks. The service runs KiCad CLI's PCB DRC with JSON output and exports copper layers for the board preview. This adds KiCad's net/connectivity checks, including unconnected items and shorts, along with board setup rules. KiCad must be installed locally for local development; the Compose engine image includes KiCad CLI.
+- Gerber files contain manufacturing geometry, not schematic net intent. Use KiCad mode with the source project when checking connectivity, ground nets, shorts, and unconnected items.
 - This is an early geometry-based checker, not a manufacturing-certified DRC tool. Verify results in a PCB CAD tool and with your fabricator before ordering boards.
 
 ## Authentication
