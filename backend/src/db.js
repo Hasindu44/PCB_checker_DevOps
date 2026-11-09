@@ -43,16 +43,23 @@ async function initializeDatabase() {
       id UUID PRIMARY KEY,
       user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       filename VARCHAR(255) NOT NULL,
-      profile_id UUID NOT NULL REFERENCES drc_profiles(id),
+      profile_id UUID REFERENCES drc_profiles(id),
       profile_name VARCHAR(100) NOT NULL,
       status VARCHAR(10) NOT NULL CHECK (status IN ('PASS', 'FAIL', 'ERROR')),
       total_errors INTEGER NOT NULL DEFAULT 0 CHECK (total_errors >= 0),
+      total_warnings INTEGER NOT NULL DEFAULT 0 CHECK (total_warnings >= 0),
       errors JSONB NOT NULL DEFAULT '[]'::jsonb,
       warnings JSONB NOT NULL DEFAULT '[]'::jsonb,
       board JSONB NOT NULL DEFAULT '{}'::jsonb,
+      analysis_mode VARCHAR(10) NOT NULL DEFAULT 'GERBER',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  await pool.query(`ALTER TABLE drc_jobs ALTER COLUMN profile_id DROP NOT NULL`);
+  await pool.query(`ALTER TABLE drc_jobs ADD COLUMN IF NOT EXISTS total_warnings INTEGER NOT NULL DEFAULT 0 CHECK (total_warnings >= 0)`);
+  await pool.query(`ALTER TABLE drc_jobs ADD COLUMN IF NOT EXISTS analysis_mode VARCHAR(10) NOT NULL DEFAULT 'GERBER'`);
+  await pool.query(`ALTER TABLE drc_jobs DROP CONSTRAINT IF EXISTS drc_jobs_status_check`);
+  await pool.query(`ALTER TABLE drc_jobs ADD CONSTRAINT drc_jobs_status_check CHECK (status IN ('PASS', 'WARN', 'FAIL', 'ERROR'))`);
   await pool.query(`ALTER TABLE drc_jobs ADD COLUMN IF NOT EXISTS board JSONB NOT NULL DEFAULT '{}'::jsonb`);
   await pool.query(`CREATE INDEX IF NOT EXISTS drc_jobs_user_created_idx ON drc_jobs (user_id, created_at DESC)`);
 }

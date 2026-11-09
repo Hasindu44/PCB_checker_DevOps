@@ -16,6 +16,7 @@ export default function TracelabDashboard({ user, onLogout }) {
   const fileInputRef = useRef(null);
   const [profiles, setProfiles] = useState([]);
   const [profileId, setProfileId] = useState('');
+  const [analysisMode, setAnalysisMode] = useState('GERBER');
   const [jobs, setJobs] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
   const [selectedErrorIndex, setSelectedErrorIndex] = useState(0);
@@ -34,7 +35,7 @@ export default function TracelabDashboard({ user, onLogout }) {
   const warnings = Array.isArray(selectedJob?.warnings) ? selectedJob.warnings : [];
   const orderedErrors = useMemo(() => rankFindings(errors), [errors]);
   const passCount = jobs.filter((job) => job.status === 'PASS').length;
-  const flaggedCount = jobs.filter((job) => job.status === 'FAIL').length;
+  const flaggedCount = jobs.filter((job) => ['FAIL', 'WARN'].includes(job.status)).length;
   const pageNames = { scan: 'New analysis', overview: 'Overview', board: 'Board', review: 'Review', history: 'History', library: 'Library' };
 
   useEffect(() => {
@@ -69,7 +70,7 @@ export default function TracelabDashboard({ user, onLogout }) {
   function queueFile(file) {
     if (!file) return;
     if (!file.name.toLowerCase().endsWith('.zip')) {
-      showNotice('Choose a ZIP archive containing Gerber fabrication files.', 'error');
+      showNotice('Choose a ZIP archive containing Gerber files or a KiCad project.', 'error');
       return;
     }
     if (file.size > 25 * 1024 * 1024) {
@@ -85,7 +86,7 @@ export default function TracelabDashboard({ user, onLogout }) {
       fileInputRef.current?.click();
       return;
     }
-    if (!profileId) {
+    if (analysisMode === 'GERBER' && !profileId) {
       showNotice('Choose a manufacturing profile before starting the analysis.', 'error');
       return;
     }
@@ -93,12 +94,13 @@ export default function TracelabDashboard({ user, onLogout }) {
     setBusy(true);
     showNotice(`Analysing ${file.name}…`, 'info');
     try {
-      const newJob = await drcApi.validate(file, profileId);
+      const newJob = await drcApi.validate(file, profileId, analysisMode);
       setSelectedJob(newJob);
       setSelectedErrorIndex(0);
       setJobs((current) => [newJob, ...current.filter((job) => job.id !== newJob.id)].slice(0, 50));
       setActivePage('overview');
-      showNotice(newJob.status === 'PASS' ? 'Analysis complete. No rule violations found.' : `Analysis complete. ${newJob.total_errors ?? newJob.errors?.length ?? 0} finding(s) to review.`, newJob.status === 'PASS' ? 'success' : 'warning');
+      const findingCount = (newJob.total_errors || 0) + (newJob.total_warnings || 0);
+      showNotice(newJob.status === 'PASS' ? 'Analysis complete. No rule violations found.' : `Analysis complete. ${findingCount} finding(s) to review.`, newJob.status === 'PASS' ? 'success' : 'warning');
     } catch (error) {
       if (error.data?.id) {
         setSelectedJob(error.data);
@@ -145,7 +147,10 @@ export default function TracelabDashboard({ user, onLogout }) {
       filename: selectedJob.filename,
       created_at: selectedJob.created_at,
       status: selectedJob.status,
+      analysis_mode: selectedJob.analysis_mode || 'GERBER',
       profile: selectedJob.profile_name,
+      total_errors: selectedJob.total_errors,
+      total_warnings: selectedJob.total_warnings,
       board_dimensions_mm: selectedJob.board ? { width: selectedJob.board.width, height: selectedJob.board.height } : null,
       findings: errors,
       warnings,
@@ -208,6 +213,8 @@ export default function TracelabDashboard({ user, onLogout }) {
                 selectedProfile={selectedProfile}
                 profileId={profileId}
                 setProfileId={setProfileId}
+                analysisMode={analysisMode}
+                setAnalysisMode={setAnalysisMode}
                 onStart={startAnalysis}
               />
             )}
@@ -234,18 +241,18 @@ export default function TracelabDashboard({ user, onLogout }) {
       </main>
       <footer className="tl-footer">
         <span>Tracelab <i>·</i> PCB design review</span>
-        <span>Geometry-based checks are a review aid. Verify critical results with your CAD tool and fabricator.</span>
+        <span>Automated checks are a review aid. Verify critical results in your CAD tool and with your fabricator.</span>
       </footer>
       {notice && <div className={`tl-toast is-${notice.type}`} role="status"><span className="tl-toast-dot" />{notice.text}<button type="button" onClick={() => setNotice(null)} aria-label="Dismiss notification">×</button></div>}
     </div>
   );
 }
 
-function ScanPage({ fileInputRef, pendingFile, setPendingFile, queueFile, dragActive, setDragActive, busy, profiles, selectedProfile, profileId, setProfileId, onStart }) {
+function ScanPage({ fileInputRef, pendingFile, setPendingFile, queueFile, dragActive, setDragActive, busy, profiles, selectedProfile, profileId, setProfileId, analysisMode, setAnalysisMode, onStart }) {
   return (
     <section className="tl-content">
       <div className="tl-page-heading tl-scan-heading">
-        <div><p className="tl-eyebrow">NEW ANALYSIS</p><h1>Drop a board in.</h1><p className="tl-lede">Upload a Gerber package and check it against the manufacturing limits you choose.</p></div>
+        <div><p className="tl-eyebrow">NEW ANALYSIS</p><h1>Drop a board in.</h1><p className="tl-lede">Run KiCad’s native net-aware design checks, or review fabrication Gerbers against a manufacturing profile.</p></div>
       </div>
       <div className="tl-scan-grid">
         <div
@@ -263,29 +270,29 @@ function ScanPage({ fileInputRef, pendingFile, setPendingFile, queueFile, dragAc
               <div className="tl-file-chip"><Icon name="file" /><span title={pendingFile.name}>{pendingFile.name}</span><small>{formatBytes(pendingFile.size)}</small><button type="button" onClick={() => { setPendingFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }} aria-label="Remove file">×</button></div>
             </>
           ) : (
-            <><p className="tl-drop-title">Drag a Gerber ZIP here</p><p className="tl-drop-hint">or choose an archive from your computer</p></>
+            <><p className="tl-drop-title">Drag a project ZIP here</p><p className="tl-drop-hint">or choose an archive from your computer</p></>
           )}
           <button type="button" className="tl-button tl-button-dark tl-choose-file" disabled={busy} onClick={() => fileInputRef.current?.click()}>
             {pendingFile ? 'Choose a different file' : 'Choose a ZIP file'}
           </button>
-          <div className="tl-file-types"><span>Gerber ZIP</span><span>Excellon drill files supported</span><span>25 MB max</span></div>
+          <div className="tl-file-types"><span>{analysisMode === 'KICAD' ? 'KiCad ZIP · one .kicad_pcb required' : 'Gerber ZIP'}</span><span>{analysisMode === 'KICAD' ? 'Add matching .kicad_sch for parity checks' : 'Excellon drill files supported'}</span><span>25 MB max</span></div>
         </div>
         <aside className="tl-check-panel">
-          <div className="tl-panel-label">WHAT SHOULD WE CHECK?</div>
-          <label className="tl-profile-label" htmlFor="profile-select">Manufacturing profile</label>
-          <select id="profile-select" className="tl-profile-select" value={profileId} onChange={(event) => setProfileId(event.target.value)} disabled={!profiles.length}>
-            {profiles.length ? profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}{profile.isDefault ? ' · Default' : ''}</option>) : <option value="">No profiles available</option>}
-          </select>
-          {selectedProfile ? (
-            <div className="tl-rule-list">
-              <RuleRow label="Minimum trace width" value={selectedProfile.minTraceWidth} />
-              <RuleRow label="Copper clearance" value={selectedProfile.minClearance} />
-              <RuleRow label="Annular ring" value={selectedProfile.minAnnularRing} />
-            </div>
-          ) : <p className="tl-empty-note">A manufacturing profile is needed before an analysis can start.</p>}
+          <div className="tl-panel-label">CHOOSE ANALYSIS TYPE</div>
+          <div className="tl-analysis-modes" role="group" aria-label="Analysis type">
+            <button type="button" className={analysisMode === 'KICAD' ? 'is-selected' : ''} onClick={() => setAnalysisMode('KICAD')}><strong>KiCad native DRC</strong><small>Connectivity, shorts, clearances, board rules</small></button>
+            <button type="button" className={analysisMode === 'GERBER' ? 'is-selected' : ''} onClick={() => setAnalysisMode('GERBER')}><strong>Fabrication files</strong><small>Trace width, copper spacing, annular ring</small></button>
+          </div>
+          {analysisMode === 'GERBER' ? <>
+            <label className="tl-profile-label" htmlFor="profile-select">Manufacturing profile</label>
+            <select id="profile-select" className="tl-profile-select" value={profileId} onChange={(event) => setProfileId(event.target.value)} disabled={!profiles.length}>
+              {profiles.length ? profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}{profile.isDefault ? ' · Default' : ''}</option>) : <option value="">No profiles available</option>}
+            </select>
+            {selectedProfile ? <div className="tl-rule-list"><RuleRow label="Minimum trace width" value={selectedProfile.minTraceWidth} /><RuleRow label="Copper clearance" value={selectedProfile.minClearance} /><RuleRow label="Annular ring" value={selectedProfile.minAnnularRing} /></div> : <p className="tl-empty-note">A manufacturing profile is needed before an analysis can start.</p>}
+          </> : <div className="tl-kicad-note"><strong>Uses rules stored with the board</strong><p>Include the .kicad_pcb file. A matching .kicad_pro supplies project settings; a matching .kicad_sch enables schematic parity checks.</p></div>}
           <div className="tl-panel-bottom">
-            <span className="tl-muted">Checks use the selected profile’s limits.</span>
-            <button type="button" className="tl-button tl-button-orange" onClick={onStart} disabled={busy || !profiles.length}>
+            <span className="tl-muted">{analysisMode === 'KICAD' ? 'Native DRC runs in the processing service.' : 'Checks use the selected profile’s limits.'}</span>
+            <button type="button" className="tl-button tl-button-orange" onClick={onStart} disabled={busy || (analysisMode === 'GERBER' && !profiles.length)}>
               {busy ? <><span className="tl-spinner" />Analysing…</> : 'Start analysis'}
             </button>
           </div>
@@ -297,25 +304,25 @@ function ScanPage({ fileInputRef, pendingFile, setPendingFile, queueFile, dragAc
 }
 
 function OverviewPage({ job, errors, warnings, selectedErrorIndex, onSelectFinding, onOpenReview, onExport, onUpload, busy }) {
-  const count = job.total_errors ?? job.errors?.length ?? 0;
+  const count = (job.total_errors || 0) + (job.total_warnings || 0) || job.errors?.length || 0;
   const pass = job.status === 'PASS';
   const isError = job.status === 'ERROR';
   return (
     <section className="tl-content">
-      <div className="tl-overview-meta"><p className="tl-eyebrow">{job.profile_name || 'MANUFACTURING REVIEW'} <i>·</i> {job.filename || 'CURRENT BOARD'}</p><span className={`tl-status-label is-${job.status?.toLowerCase() || 'error'}`}><i />{statusLabel(job.status)}</span></div>
+      <div className="tl-overview-meta"><p className="tl-eyebrow">{job.analysis_mode === 'KICAD' ? 'KICAD NATIVE DRC' : job.profile_name || 'MANUFACTURING REVIEW'} <i>·</i> {job.filename || 'CURRENT BOARD'}</p><span className={`tl-status-label is-${job.status?.toLowerCase() || 'error'}`}><i />{statusLabel(job.status)}</span></div>
       <div className="tl-result-heading">
-        <div><h1>{pass ? <>Passes selected checks.<br /><em>Ready for review.</em></> : <>{isError ? 'Analysis needs attention.' : 'Fails inspection.'} <em>{count} {count === 1 ? 'finding' : 'findings'}.</em></>}</h1><p className="tl-lede">{pass ? 'No violations were returned for the selected manufacturing profile.' : isError ? 'The archive could not be fully analysed. Review the processing message below.' : 'Start with the highest-priority finding, then use its marker to locate the geometry.'}</p></div>
+        <div><h1>{pass ? <>Passes selected checks.<br /><em>Ready for review.</em></> : <>{isError ? 'Analysis needs attention.' : job.status === 'WARN' ? 'Review the analysis notes.' : 'Fails inspection.'} <em>{count} {count === 1 ? 'finding' : 'findings'}.</em></>}</h1><p className="tl-lede">{pass ? (job.analysis_mode === 'KICAD' ? 'KiCad reported no violations in the checks that ran.' : 'No violations were returned for the selected manufacturing profile.') : isError ? 'The archive could not be fully analysed. Review the processing message below.' : 'Start with the highest-priority finding, then use its marker to locate the geometry.'}</p></div>
         <div className="tl-heading-actions"><button type="button" className="tl-button tl-button-outline" onClick={onExport}>Export report</button><button type="button" className="tl-button tl-button-dark" onClick={onUpload}>Scan another board</button></div>
       </div>
       <div className="tl-overview-grid">
         <div className="tl-board-card">
-          <div className="tl-card-topline"><span>BOARD PREVIEW</span><span>{job.board?.width && job.board?.height ? `${Number(job.board.width).toFixed(2)} × ${Number(job.board.height).toFixed(2)} mm copper extents` : 'GERBER COPPER LAYERS'}</span></div>
+          <div className="tl-card-topline"><span>BOARD PREVIEW</span><span>{job.board?.width && job.board?.height ? `${Number(job.board.width).toFixed(2)} × ${Number(job.board.height).toFixed(2)} mm copper extents` : `${job.analysis_mode === 'KICAD' ? 'KICAD' : 'GERBER'} COPPER LAYERS`}</span></div>
           <PCBViewer board={job.board} errors={job.errors || []} selectedErrorIndex={selectedErrorIndex} onSelectError={(index) => onSelectFinding(index, 'board')} isLoading={busy} />
         </div>
         <div className="tl-overview-side">
           <section className="tl-panel tl-priority-panel">
             <div className="tl-panel-label">{pass ? 'CHECK SUMMARY' : 'REVIEW IN THIS ORDER'}</div>
-            {errors.length ? <div className="tl-priority-list">{errors.slice(0, 4).map(({ error, index }, order) => <button type="button" className={`tl-priority-row ${selectedErrorIndex === index ? 'is-selected' : ''}`} key={`${index}-${error.rule}`} onClick={() => onSelectFinding(index, 'board')}><span className={`tl-priority-number ${findingTone(error.rule)}`}>{order + 1}</span><span className="tl-priority-copy"><strong>{ruleTitle(error.rule)}</strong><small>{error.message}</small><em>{coordinateLabel(error.coordinates)}</em></span></button>)}</div> : <div className={`tl-clean-state ${isError ? 'is-error' : ''}`}><span className="tl-clean-mark"><Icon name={isError ? 'alert' : 'check'} /></span><strong>{isError ? 'Could not complete this check' : 'No rule violations found'}</strong><p>{isError ? errors[0]?.error?.message || job.errors?.[0]?.message : 'The board meets the selected profile limits for the checks performed.'}</p></div>}
+            {errors.length ? <div className="tl-priority-list">{errors.slice(0, 4).map(({ error, index }, order) => <button type="button" className={`tl-priority-row ${selectedErrorIndex === index ? 'is-selected' : ''}`} key={`${index}-${error.rule}`} onClick={() => onSelectFinding(index, 'board')}><span className={`tl-priority-number ${findingTone(error.rule)}`}>{order + 1}</span><span className="tl-priority-copy"><strong>{ruleTitle(error.rule)}{error.severity === 'warning' ? ' · Warning' : ''}</strong><small>{error.message}</small><em>{coordinateLabel(error.coordinates)}</em></span></button>)}</div> : <div className={`tl-clean-state ${isError ? 'is-error' : ''}`}><span className="tl-clean-mark"><Icon name={isError ? 'alert' : 'check'} /></span><strong>{isError ? 'Could not complete this check' : 'No rule violations found'}</strong><p>{isError ? errors[0]?.error?.message || job.errors?.[0]?.message : 'The board meets the selected profile limits for the checks performed.'}</p></div>}
             {errors.length > 4 && <button type="button" className="tl-text-link" onClick={onOpenReview}>See all {errors.length} findings <Icon name="chevron" /></button>}
             {errors.length > 0 && errors.length <= 4 && <button type="button" className="tl-text-link" onClick={onOpenReview}>Open full review <Icon name="chevron" /></button>}
           </section>
@@ -356,11 +363,11 @@ function ReviewPage({ job, errors, warnings, onSelectFinding, onExport }) {
       <div className="tl-page-heading"><div><p className="tl-eyebrow">DESIGN REVIEW <i>·</i> BEFORE FABRICATION</p><h1>{errors.length ? <>{errors.length} {errors.length === 1 ? 'finding needs' : 'findings need'}<br /><em>your attention.</em></> : 'No findings in this review.'}</h1><p className="tl-lede">{job.filename} <i>·</i> Profile: {job.profile_name || 'Not recorded'}</p></div><button type="button" className="tl-button tl-button-outline" onClick={onExport}>Export report</button></div>
       <div className="tl-review-grid">
         <div className="tl-review-list">
-          {errors.length ? errors.map(({ error, index }, position) => <article className="tl-review-card" key={`${index}-${error.rule}`}><div className="tl-review-title"><span className={`tl-priority-number ${findingTone(error.rule)}`}>{position + 1}</span><div><p className="tl-panel-label">{ruleTitle(error.rule)}</p><h2>{error.message}</h2></div></div><div className="tl-review-card-footer"><span className="tl-coordinate-pill"><Icon name="target" />{coordinateLabel(error.coordinates)}</span><button type="button" className="tl-inline-button" onClick={() => onSelectFinding(index, 'board')}>Locate on board <Icon name="chevron" /></button></div></article>) : <div className="tl-panel tl-no-findings"><span className="tl-clean-mark"><Icon name="check" /></span><div><h2>Nothing to fix in this pass.</h2><p>The uploaded geometry passed the checks included in this report.</p></div></div>}
+          {errors.length ? errors.map(({ error, index }, position) => <article className="tl-review-card" key={`${index}-${error.rule}`}><div className="tl-review-title"><span className={`tl-priority-number ${findingTone(error.rule)}`}>{position + 1}</span><div><p className="tl-panel-label">{ruleTitle(error.rule)}{error.severity === 'warning' ? ' · WARNING' : ''}</p><h2>{error.message}</h2></div></div><div className="tl-review-card-footer"><span className="tl-coordinate-pill"><Icon name="target" />{coordinateLabel(error.coordinates)}</span><button type="button" className="tl-inline-button" onClick={() => onSelectFinding(index, 'board')}>Locate on board <Icon name="chevron" /></button></div></article>) : <div className="tl-panel tl-no-findings"><span className="tl-clean-mark"><Icon name="check" /></span><div><h2>Nothing to fix in this pass.</h2><p>The uploaded geometry passed the checks included in this report.</p></div></div>}
         </div>
         <aside className="tl-review-aside">
           <section className="tl-panel"><p className="tl-panel-label">ANALYSIS NOTES <span>{warnings.length}</span></p>{warnings.length ? <ul className="tl-warning-list">{warnings.map((warning, index) => <li key={`${warning}-${index}`}><i /><span>{warning}</span></li>)}</ul> : <p className="tl-muted">No additional analysis notes were returned.</p>}</section>
-          <section className="tl-panel tl-profile-summary"><p className="tl-panel-label">PROFILE USED</p><h2>{job.profile_name || 'Manufacturing profile'}</h2><p className="tl-muted">This report records the profile selected when the archive was analysed.</p></section>
+          <section className="tl-panel tl-profile-summary"><p className="tl-panel-label">{job.analysis_mode === 'KICAD' ? 'RULES SOURCE' : 'PROFILE USED'}</p><h2>{job.profile_name || 'Manufacturing profile'}</h2><p className="tl-muted">{job.analysis_mode === 'KICAD' ? 'KiCad applied the board and project design rules for this review.' : 'This report records the profile selected when the archive was analysed.'}</p></section>
         </aside>
       </div>
     </section>
@@ -372,10 +379,10 @@ function HistoryPage({ jobs, selectedJobId, onOpenJob, onRefresh, refreshing }) 
   return (
     <section className="tl-content">
       <div className="tl-page-heading tl-history-heading"><div><p className="tl-eyebrow">SAVED REVIEWS <i>·</i> YOUR WORKSPACE</p><h1>{jobs.length} {jobs.length === 1 ? 'scan' : 'scans'}. <em>{passed} passed.</em></h1></div><button type="button" className="tl-button tl-button-outline" onClick={onRefresh} disabled={refreshing}><Icon name="refresh" className={refreshing ? 'is-spinning' : ''} />{refreshing ? 'Refreshing…' : 'Refresh history'}</button></div>
-      {jobs.length > 0 && <section className="tl-panel tl-history-strip"><div className="tl-history-strip-heading"><span>RECENT SCANS, NEWEST FIRST</span><div><i className="is-pass" /> Pass <i className="is-fail" /> Needs review <i className="is-error" /> Error</div></div><div className="tl-history-tiles">{jobs.slice(0, 42).map((job, index) => <button type="button" key={job.id} title={`${job.filename} · ${statusLabel(job.status)}`} aria-label={`Open ${job.filename}, ${statusLabel(job.status)}`} className={`tl-history-tile is-${job.status?.toLowerCase()} ${selectedJobId === job.id ? 'is-current' : ''}`} onClick={() => onOpenJob(job)}><span>{index + 1}</span></button>)}</div></section>}
+      {jobs.length > 0 && <section className="tl-panel tl-history-strip"><div className="tl-history-strip-heading"><span>RECENT SCANS, NEWEST FIRST</span><div><i className="is-pass" /> Pass <i className="is-warn" /> Warnings <i className="is-fail" /> Needs review <i className="is-error" /> Error</div></div><div className="tl-history-tiles">{jobs.slice(0, 42).map((job, index) => <button type="button" key={job.id} title={`${job.filename} · ${statusLabel(job.status)}`} aria-label={`Open ${job.filename}, ${statusLabel(job.status)}`} className={`tl-history-tile is-${job.status?.toLowerCase()} ${selectedJobId === job.id ? 'is-current' : ''}`} onClick={() => onOpenJob(job)}><span>{index + 1}</span></button>)}</div></section>}
       <div className="tl-history-grid">
-        <section className="tl-panel tl-recent-scans"><p className="tl-panel-label">RECENT SCANS</p>{jobs.length ? <div className="tl-scan-list">{jobs.map((job) => <article className="tl-scan-row" key={job.id}><span className={`tl-scan-thumb is-${job.status?.toLowerCase()}`}><Icon name="board" /></span><div className="tl-scan-file"><strong title={job.filename}>{job.filename}</strong><small>{formatDate(job.created_at)} <i>·</i> {job.profile_name || 'Profile not recorded'}</small></div><div className={`tl-scan-status is-${job.status?.toLowerCase()}`}>{statusLabel(job.status)}{job.status !== 'PASS' && <small>{job.total_errors ?? 0} findings</small>}</div><button type="button" className="tl-button tl-button-outline tl-row-action" onClick={() => onOpenJob(job)}>Open report</button></article>)}</div> : <div className="tl-empty-history"><p>No saved scans yet.</p><small>New analyses will appear here.</small></div>}</section>
-        <aside className="tl-history-aside"><section className="tl-panel"><p className="tl-panel-label">THIS WORKSPACE</p><div className="tl-history-counts"><span><strong>{jobs.length}</strong> scans</span><span><strong>{jobs.filter((job) => job.status === 'FAIL').length}</strong> flagged</span><span><strong>{jobs.filter((job) => job.status === 'ERROR').length}</strong> errors</span></div><p className="tl-muted">Counts reflect the saved scan history shown here.</p></section></aside>
+        <section className="tl-panel tl-recent-scans"><p className="tl-panel-label">RECENT SCANS</p>{jobs.length ? <div className="tl-scan-list">{jobs.map((job) => <article className="tl-scan-row" key={job.id}><span className={`tl-scan-thumb is-${job.status?.toLowerCase()}`}><Icon name="board" /></span><div className="tl-scan-file"><strong title={job.filename}>{job.filename}</strong><small>{formatDate(job.created_at)} <i>·</i> {job.analysis_mode === 'KICAD' ? 'KiCad native rules' : job.profile_name || 'Profile not recorded'}</small></div><div className={`tl-scan-status is-${job.status?.toLowerCase()}`}>{statusLabel(job.status)}{job.status !== 'PASS' && <small>{(job.total_errors || 0) + (job.total_warnings || 0)} findings</small>}</div><button type="button" className="tl-button tl-button-outline tl-row-action" onClick={() => onOpenJob(job)}>Open report</button></article>)}</div> : <div className="tl-empty-history"><p>No saved scans yet.</p><small>New analyses will appear here.</small></div>}</section>
+        <aside className="tl-history-aside"><section className="tl-panel"><p className="tl-panel-label">THIS WORKSPACE</p><div className="tl-history-counts"><span><strong>{jobs.length}</strong> scans</span><span><strong>{jobs.filter((job) => ['FAIL', 'WARN'].includes(job.status)).length}</strong> flagged</span><span><strong>{jobs.filter((job) => job.status === 'ERROR').length}</strong> errors</span></div><p className="tl-muted">Counts reflect the saved scan history shown here.</p></section></aside>
       </div>
     </section>
   );
@@ -417,7 +424,7 @@ function ruleTitle(rule) {
 }
 
 function statusLabel(status) {
-  return ({ PASS: 'Pass', FAIL: 'Needs review', ERROR: 'Analysis error' })[status] || 'Not analysed';
+  return ({ PASS: 'Pass', WARN: 'Warnings', FAIL: 'Needs review', ERROR: 'Analysis error' })[status] || 'Not analysed';
 }
 
 function coordinateLabel(coordinates) {

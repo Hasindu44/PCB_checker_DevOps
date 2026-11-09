@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import io
+import asyncio
+import json
 import math
+import os
 import re
+import subprocess
+import tempfile
 import zipfile
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import gerber
@@ -42,14 +47,17 @@ class DrcError(BaseModel):
     rule: str
     message: str
     coordinates: Coordinates
+    severity: str = "error"
 
 
 class ValidationResult(BaseModel):
     status: str
     total_errors: int
+    total_warnings: int = 0
     errors: list[DrcError]
     warnings: list[str]
     board: dict[str, Any]
+    analysis_mode: str = "GERBER"
 
 
 def _positive_number(value: Any) -> float | None:
@@ -352,6 +360,133 @@ def _check_annular_ring(
     return errors
 
 
+def _kicad_findings(report: dict[str, Any]) -> list[DrcError]:
+    findings: list[DrcError] = []
+    for section in ("violations", "unconnected_items", "schematic_parity"):
+        entries = report.get(section, [])
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict) or entry.get("excluded"):
+                continue
+            rule = str(entry.get("type") or section).upper().replace(" ", "_")
+            description = str(entry.get("description") or rule.replace("_", " ").title())
+            severity = str(entry.get("severity") or "error").lower()
+            if severity not in {"error", "warning"}:
+                severity = "error"
+            items = entry.get("items") if isinstance(entry.get("items"), list) else []
+            positions = [item.get("pos") for item in items if isinstance(item, dict) and isinstance(item.get("pos"), dict)]
+            pos = positions[0] if positions else entry.get("pos", {})
+            if not isinstance(pos, dict):
+                pos = {}
+            try:
+                x, y = float(pos.get("x", 0)), float(pos.get("y", 0))
+                if not math.isfinite(x) or not math.isfinite(y):
+                    x, y = 0.0, 0.0
+            except (TypeError, ValueError):
+                x, y = 0.0, 0.0
+            affected = [str(item.get("description")) for item in items if isinstance(item, dict) and item.get("description")]
+            message = description
+            if affected:
+                message += " Affected: " + "; ".join(affected[:3])
+                if len(affected) > 3:
+                    message += f"; and {len(affected) - 3} more item(s)"
+            findings.append(DrcError(
+                rule=rule[:100], message=message[:2000],
+                coordinates=Coordinates(x=round(x, 4), y=round(y, 4)), severity=severity,
+            ))
+            if len(findings) >= MAX_REPORTED_ERRORS:
+                return findings
+    return findings
+
+
+def _kicad_board_preview(cli: str, board_path: Path, output_dir: Path) -> dict[str, Any]:
+    preview_dir = output_dir / "preview"
+    preview_dir.mkdir()
+    command = [cli, "pcb", "export", "gerbers", "--layers", "F.Cu,B.Cu,In1.Cu,In2.Cu,In3.Cu,In4.Cu,In5.Cu,In6.Cu,In7.Cu,In8.Cu", "--output", str(preview_dir) + os.sep, str(board_path)]
+    result = subprocess.run(command, cwd=board_path.parent, capture_output=True, text=True, timeout=45, check=False)
+    if result.returncode != 0:
+        raise RuntimeError("KiCad could not export copper geometry for the preview.")
+    parsed_layers: list[tuple[str, list[Any], list[BaseGeometry]]] = []
+    for gerber_path in sorted(preview_dir.glob("*")):
+        if not gerber_path.is_file() or not _is_copper_file(gerber_path.name):
+            continue
+        layer = _parse_layer(gerber_path.name, gerber_path.read_bytes())
+        primitives = list(getattr(layer, "primitives", []))[:MAX_PRIMITIVES_PER_LAYER]
+        shapes = [geometry for primitive in primitives
+                  if getattr(primitive, "level_polarity", "dark") == "dark"
+                  if (geometry := _primitive_geometry(primitive)) is not None and not geometry.is_empty]
+        if shapes:
+            parsed_layers.append((gerber_path.name, primitives, shapes))
+    if not parsed_layers:
+        raise RuntimeError("KiCad exported no previewable copper layers.")
+    return _board_visualization(parsed_layers)
+
+
+def _validate_kicad(archive: zipfile.ZipFile, members: list[zipfile.ZipInfo], cli: str) -> ValidationResult:
+    boards = [item for item in members if PurePosixPath(item.filename).suffix.lower() == ".kicad_pcb"]
+    if len(boards) != 1:
+        raise HTTPException(status_code=422, detail="A KiCad ZIP must contain exactly one .kicad_pcb board file.")
+
+    board_member = boards[0]
+    board_rel = PurePosixPath(board_member.filename.replace("\\", "/"))
+    sibling_names = {board_rel.with_suffix(suffix).as_posix(): suffix for suffix in (".kicad_pro", ".kicad_sch", ".kicad_dru")}
+    included = [board_member]
+    included.extend(item for item in members if (
+        item.filename.replace("\\", "/") in sibling_names
+        or PurePosixPath(item.filename).suffix.lower() == ".kicad_sch"
+    ))
+
+    with tempfile.TemporaryDirectory(prefix="circuitguard-kicad-") as temp_dir:
+        root = Path(temp_dir).resolve()
+        extracted: dict[str, Path] = {}
+        for item in included:
+            rel = PurePosixPath(item.filename.replace("\\", "/"))
+            target = (root / Path(*rel.parts)).resolve()
+            if root not in target.parents:
+                raise HTTPException(status_code=400, detail="The archive contains an unsafe path.")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(archive.read(item))
+            extracted[item.filename.replace("\\", "/")] = target
+        board_path = extracted[board_member.filename.replace("\\", "/")]
+        schematic_rel = board_rel.with_suffix(".kicad_sch").as_posix()
+        has_schematic = schematic_rel in extracted
+        report_path = root / "drc-report.json"
+        command = [cli, "pcb", "drc", "--format", "json", "--units", "mm", "--output", str(report_path), "--severity-all"]
+        if has_schematic:
+            command.append("--schematic-parity")
+        command.append(str(board_path))
+        try:
+            completed = subprocess.run(command, cwd=board_path.parent, capture_output=True, text=True, timeout=90, check=False)
+        except subprocess.TimeoutExpired as exc:
+            raise HTTPException(status_code=408, detail="KiCad DRC exceeded the 90 second processing limit.") from exc
+        except OSError as exc:
+            raise HTTPException(status_code=503, detail="KiCad DRC could not be started. Check the kicad-cli installation.") from exc
+        if not report_path.is_file():
+            detail = (completed.stderr or completed.stdout or "KiCad did not produce a DRC report.")[-500:]
+            raise HTTPException(status_code=422, detail=f"KiCad could not analyse this project: {detail}")
+        try:
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise HTTPException(status_code=502, detail="KiCad produced an unreadable DRC report.") from exc
+        if not isinstance(report, dict):
+            raise HTTPException(status_code=502, detail="KiCad produced an invalid DRC report.")
+        findings = _kicad_findings(report)
+        warnings: list[str] = []
+        if not has_schematic:
+            warnings.append("No matching .kicad_sch file was included, so schematic parity checks were skipped.")
+        board: dict[str, Any] = {}
+        try:
+            board = _kicad_board_preview(cli, board_path, root)
+        except (RuntimeError, OSError, subprocess.TimeoutExpired, HTTPException):
+            warnings.append("KiCad DRC completed, but the copper preview could not be generated.")
+        error_count = sum(finding.severity == "error" for finding in findings)
+        warning_count = sum(finding.severity == "warning" for finding in findings)
+        status = "FAIL" if error_count else "WARN" if warning_count or warnings else "PASS"
+        return ValidationResult(status=status, total_errors=error_count, total_warnings=warning_count,
+                                errors=findings, warnings=warnings, board=board, analysis_mode="KICAD")
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -360,13 +495,14 @@ def health() -> dict[str, str]:
 @app.post("/validate", response_model=ValidationResult)
 async def validate(
     file: UploadFile = File(...),
-    min_clearance: float = Form(..., gt=0, le=10),
-    min_trace_width: float = Form(..., gt=0, le=10),
+    min_clearance: float = Form(0.2, gt=0, le=10),
+    min_trace_width: float = Form(0.2, gt=0, le=10),
     min_annular_ring: float = Form(0, ge=0, le=10),
+    analysis_mode: str = Form("GERBER"),
 ) -> ValidationResult:
     filename = file.filename or ""
     if PurePosixPath(filename.replace("\\", "/")).suffix.lower() != ".zip":
-        raise HTTPException(status_code=400, detail="Upload a Gerber ZIP archive.")
+        raise HTTPException(status_code=400, detail="Upload a ZIP archive.")
 
     content = await file.read(MAX_ARCHIVE_BYTES + 1)
     await file.close()
@@ -380,6 +516,12 @@ async def validate(
 
     with archive:
         members = _archive_members(archive)
+        mode = analysis_mode.strip().upper()
+        if mode not in {"GERBER", "KICAD"}:
+            raise HTTPException(status_code=400, detail="Choose GERBER or KICAD analysis mode.")
+        if mode == "KICAD":
+            cli = os.environ.get("KICAD_CLI_PATH", "kicad-cli")
+            return await asyncio.to_thread(_validate_kicad, archive, members, cli)
         copper_members = [info for info in members if _is_copper_file(info.filename)]
         drill_members = [info for info in members if _is_drill_file(info.filename)]
         if not copper_members:
@@ -434,7 +576,9 @@ async def validate(
     return ValidationResult(
         status="FAIL" if errors else "PASS",
         total_errors=len(errors),
+        total_warnings=0,
         errors=errors,
         warnings=warnings,
         board=board,
+        analysis_mode="GERBER",
     )

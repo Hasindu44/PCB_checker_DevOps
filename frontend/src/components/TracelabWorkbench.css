@@ -101,6 +101,14 @@
 .tl-file-chip button { flex: none; display: grid; place-items: center; width: 25px; height: 25px; border: 0; border-radius: 50%; background: transparent; color: #717a73; font-size: 20px; }
 .tl-file-chip button:hover { background: #eef1eb; }
 .tl-check-panel { min-height: 480px; display: flex; flex-direction: column; padding: clamp(25px, 3vw, 38px); }
+.tl-analysis-modes { display: grid; gap: 9px; margin: 17px 0 23px; }
+.tl-analysis-modes button { display: grid; gap: 5px; padding: 13px 15px; border: 1px solid var(--tl-line); border-radius: 12px; background: #fff; color: var(--tl-ink); text-align: left; cursor: pointer; }
+.tl-analysis-modes button.is-selected { border-color: var(--tl-green); background: #f2f8f4; box-shadow: inset 3px 0 var(--tl-green); }
+.tl-analysis-modes button strong { font-size: 13px; }
+.tl-analysis-modes button small { color: var(--tl-muted); line-height: 1.45; }
+.tl-kicad-note { padding: 17px; border: 1px solid var(--tl-line); border-radius: 12px; background: #f8f9f7; }
+.tl-kicad-note strong { font-size: 13px; }
+.tl-kicad-note p { margin: 8px 0 0; color: var(--tl-muted); font-size: 12px; line-height: 1.6; }
 .tl-profile-label { margin: 24px 0 8px; font-size: 14px; font-weight: 650; }
 .tl-profile-select { min-height: 47px; width: 100%; padding: 0 14px; border: 1px solid #dce1da; border-radius: 9px; background: #fff; color: #243128; font-size: 14px; }
 .tl-rule-list { margin-top: 16px; border-top: 1px solid #e2e6e0; }
@@ -123,6 +131,7 @@
 .tl-status-label { flex: none; display: inline-flex; align-items: center; gap: 8px; color: #49584e; font-family: "SFMono-Regular", Consolas, monospace; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
 .tl-status-label i { width: 8px; height: 8px; border-radius: 50%; background: var(--tl-amber); }
 .tl-status-label.is-pass i { background: var(--tl-green); }
+.tl-status-label.is-warn i { background: #c68b22; }
 .tl-status-label.is-fail i, .tl-status-label.is-error i { background: var(--tl-orange); }
 .tl-result-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 32px; }
 .tl-result-heading h1 { margin-top: 0; font-size: clamp(38px, 4.8vw, 76px); }
@@ -211,11 +220,13 @@
 .tl-history-strip-heading > div { display: flex; align-items: center; gap: 7px; color: #637067; font-family: inherit; font-size: 10px; letter-spacing: 0; text-transform: none; }
 .tl-history-strip-heading > div i { width: 8px; height: 8px; margin-left: 10px; border-radius: 2px; background: #0d805c; }
 .tl-history-strip-heading > div i.is-fail { background: var(--tl-orange); }
+.tl-history-strip-heading > div i.is-warn { background: #c68b22; }
 .tl-history-strip-heading > div i.is-error { background: #b78220; }
 .tl-history-tiles { display: grid; grid-template-columns: repeat(14, minmax(20px, 1fr)); gap: 7px; }
 .tl-history-tile { position: relative; min-width: 0; height: 32px; border: 1px solid transparent; border-radius: 6px; background: #0e805c; color: transparent; transition: transform .14s ease; }
 .tl-history-tile:hover { transform: translateY(-2px); }
 .tl-history-tile.is-fail { background: var(--tl-orange); }
+.tl-history-tile.is-warn { background: #c68b22; }
 .tl-history-tile.is-error { background: #e9b444; }
 .tl-history-tile.is-current { outline: 2px solid #19261f; outline-offset: 2px; }
 .tl-history-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(270px, .7fr); gap: 22px; align-items: stretch; }
@@ -225,6 +236,7 @@
 .tl-scan-thumb { width: 52px; height: 43px; display: grid; place-items: center; border-radius: 8px; background: #0d5140; color: #e5bc59; }
 .tl-scan-thumb svg { width: 22px; height: 22px; }
 .tl-scan-thumb.is-fail { color: #ff684c; }
+.tl-scan-thumb.is-warn { color: #f2c76f; }
 .tl-scan-thumb.is-error { color: #f1c664; }
 .tl-scan-file { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .tl-scan-file strong { overflow: hidden; color: #18241d; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
@@ -232,6 +244,7 @@
 .tl-scan-file small i { padding: 0 4px; font-style: normal; }
 .tl-scan-status { display: flex; flex-direction: column; gap: 4px; color: #0e7956; font-size: 12px; font-weight: 690; }
 .tl-scan-status.is-fail { color: var(--tl-orange); }
+.tl-scan-status.is-warn { color: #a6781f; }
 .tl-scan-status.is-error { color: #a6781f; }
 .tl-scan-status small { color: #7d857f; font-size: 10px; font-weight: 450; }
 .tl-row-action { min-height: 36px; padding: 7px 13px; font-size: 11px; }

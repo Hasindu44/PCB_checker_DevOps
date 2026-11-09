@@ -29,9 +29,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the root .env file}
       FRONTEND_ORIGIN: http://localhost:8080
       DRC_ENGINE_URL: http://drc-engine:8000
-      DRC_ENGINE_TIMEOUT_MS: 120000
-    ports:
-      - "3000:3000"
+      DRC_ENGINE_TIMEOUT_MS: 180000
     depends_on:
       database:
         condition: service_healthy
@@ -47,8 +45,10 @@ services:
     build: ./backend-fastapi
     init: true
     restart: unless-stopped
+    environment:
+      KICAD_CLI_PATH: kicad-cli
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 10s
       timeout: 5s
       retries: 5

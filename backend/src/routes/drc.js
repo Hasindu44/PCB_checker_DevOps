@@ -9,10 +9,10 @@ const { requireUser } = require('../require-user');
 const router = express.Router();
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024, files: 1, fields: 1 },
+  limits: { fileSize: 25 * 1024 * 1024, files: 1, fields: 2 },
   fileFilter: (_req, file, callback) => {
     if (path.extname(file.originalname).toLowerCase() !== '.zip') {
-      return callback(new Error('Upload a Gerber .zip archive.'));
+      return callback(new Error('Upload a .zip archive.'));
     }
     return callback(null, true);
   },
@@ -39,13 +39,16 @@ async function saveJob({ userId, fileName, profile, result }) {
   const errors = parseJson(result.errors);
   const warnings = parseJson(result.warnings);
   const board = parseObject(result.board);
-  const status = ['PASS', 'FAIL', 'ERROR'].includes(result.status) ? result.status : 'ERROR';
+  const status = ['PASS', 'WARN', 'FAIL', 'ERROR'].includes(result.status) ? result.status : 'ERROR';
+  const totalErrors = errors.filter((error) => error?.severity !== 'warning').length;
+  const totalWarnings = errors.filter((error) => error?.severity === 'warning').length;
+  const analysisMode = result.analysis_mode === 'KICAD' ? 'KICAD' : 'GERBER';
   const id = randomUUID();
   const { rows } = await pool.query(
-    `INSERT INTO drc_jobs (id, user_id, filename, profile_id, profile_name, status, total_errors, errors, warnings, board)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb)
-     RETURNING id, filename, profile_id, profile_name, status, total_errors, errors, warnings, board, created_at`,
-    [id, userId, fileName, profile.id, profile.name, status, errors.length, JSON.stringify(errors), JSON.stringify(warnings), JSON.stringify(board)]
+    `INSERT INTO drc_jobs (id, user_id, filename, profile_id, profile_name, status, total_errors, total_warnings, errors, warnings, board, analysis_mode)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12)
+     RETURNING id, filename, profile_id, profile_name, status, total_errors, total_warnings, errors, warnings, board, analysis_mode, created_at`,
+    [id, userId, fileName, profile?.id || null, profile?.name || 'KiCad project rules', status, totalErrors, totalWarnings, JSON.stringify(errors), JSON.stringify(warnings), JSON.stringify(board), analysisMode]
   );
   return rows[0];
 }
@@ -64,25 +67,31 @@ router.get('/profiles', requireUser, async (_req, res, next) => {
 });
 
 router.post('/validate', requireUser, upload.single('file'), async (req, res, next) => {
-  if (!req.file) return res.status(400).json({ message: 'Choose a Gerber ZIP archive to upload.' });
-  if (!req.body.profileId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.body.profileId)) {
+  if (!req.file) return res.status(400).json({ message: 'Choose a ZIP archive to upload.' });
+  const analysisMode = String(req.body.analysisMode || 'GERBER').toUpperCase();
+  if (!['GERBER', 'KICAD'].includes(analysisMode)) return res.status(400).json({ message: 'Choose GERBER or KICAD analysis mode.' });
+  if (analysisMode === 'GERBER' && (!req.body.profileId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.body.profileId))) {
     return res.status(400).json({ message: 'Choose a valid manufacturing profile.' });
   }
 
   try {
-    const { rows } = await pool.query(
-      `SELECT id, name, min_trace_width, min_clearance, min_annular_ring
-       FROM drc_profiles WHERE id = $1`,
-      [req.body.profileId]
-    );
-    const profile = rows[0];
-    if (!profile) return res.status(404).json({ message: 'Manufacturing profile not found.' });
+    let profile = { id: null, name: 'KiCad project rules', min_trace_width: 0.2, min_clearance: 0.2, min_annular_ring: 0 };
+    if (analysisMode === 'GERBER') {
+      const { rows } = await pool.query(
+        `SELECT id, name, min_trace_width, min_clearance, min_annular_ring
+         FROM drc_profiles WHERE id = $1`,
+        [req.body.profileId]
+      );
+      profile = rows[0];
+      if (!profile) return res.status(404).json({ message: 'Manufacturing profile not found.' });
+    }
 
     const form = new FormData();
     form.append('file', new Blob([new Uint8Array(req.file.buffer)], { type: 'application/zip' }), req.file.originalname);
     form.append('min_trace_width', String(profile.min_trace_width));
     form.append('min_clearance', String(profile.min_clearance));
     form.append('min_annular_ring', String(profile.min_annular_ring));
+    form.append('analysis_mode', analysisMode);
 
     let engineResponse;
     let engineResult;
@@ -95,13 +104,13 @@ router.post('/validate', requireUser, upload.single('file'), async (req, res, ne
       engineResult = await engineResponse.json().catch(() => ({}));
     } catch (error) {
       const message = error.name === 'TimeoutError'
-        ? 'PCB processing timed out. Try a smaller Gerber archive.'
+        ? 'PCB processing timed out. Try a smaller archive.'
         : 'PCB processing service is unavailable.';
       const job = await saveJob({
         userId: req.user.id,
         fileName: req.file.originalname,
         profile,
-        result: { status: 'ERROR', errors: [{ rule: 'PROCESSING_ERROR', message }], warnings: [] },
+        result: { status: 'ERROR', analysis_mode: analysisMode, errors: [{ rule: 'PROCESSING_ERROR', message }], warnings: [] },
       });
       return res.status(503).json({ ...job, errors: [{ rule: 'PROCESSING_ERROR', message }], message });
     }
@@ -114,7 +123,7 @@ router.post('/validate', requireUser, upload.single('file'), async (req, res, ne
         userId: req.user.id,
         fileName: req.file.originalname,
         profile,
-        result: { status: 'ERROR', errors: [{ rule: 'PROCESSING_ERROR', message }], warnings: [] },
+        result: { status: 'ERROR', analysis_mode: analysisMode, errors: [{ rule: 'PROCESSING_ERROR', message }], warnings: [] },
       });
       return res.status(engineResponse.status >= 500 ? 502 : engineResponse.status).json({ ...job, message });
     }
@@ -134,7 +143,7 @@ router.post('/validate', requireUser, upload.single('file'), async (req, res, ne
 router.get('/jobs', requireUser, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, filename, profile_id, profile_name, status, total_errors, errors, warnings, created_at
+      `SELECT id, filename, profile_id, profile_name, status, total_errors, total_warnings, errors, warnings, analysis_mode, created_at
        FROM drc_jobs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
       [req.user.id]
     );
@@ -150,7 +159,7 @@ router.get('/jobs/:jobId', requireUser, async (req, res, next) => {
   }
   try {
     const { rows } = await pool.query(
-      `SELECT id, filename, profile_id, profile_name, status, total_errors, errors, warnings, board, created_at
+      `SELECT id, filename, profile_id, profile_name, status, total_errors, total_warnings, errors, warnings, board, analysis_mode, created_at
        FROM drc_jobs WHERE id = $1 AND user_id = $2`,
       [req.params.jobId, req.user.id]
     );
